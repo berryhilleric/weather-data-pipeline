@@ -1,0 +1,75 @@
+services:
+  postgres:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql:/sql
+      - ./sql/01_create_tables.sql:/docker-entrypoint-initdb.d/01_create_tables.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  airflow-init:
+    image: apache/airflow:2.7.0-python3.9
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+    command: >
+      bash -c "pip install dbt-postgres && \
+               airflow db migrate && \
+               airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com || true"
+    restart: on-failure
+
+  airflow:
+    image: apache/airflow:2.7.0-python3.9
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres/${POSTGRES_DB}
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY}
+      # OPENAQ_API_KEY: ${OPENAQ_API_KEY}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./logs:/opt/airflow/logs
+      - ./scripts:/opt/airflow/scripts
+      - ./dbt/weather_analytics:/dbt
+      - ./dbt/profiles.yml:/home/airflow/.dbt/profiles.yml
+    command: >
+      bash -c "pip install dbt-postgres && \
+               airflow webserver & airflow scheduler"
+
+  metabase:
+    image: metabase/metabase:latest
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
