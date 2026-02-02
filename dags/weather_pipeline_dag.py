@@ -8,7 +8,7 @@ import sys
 sys.path.append('/opt/airflow/scripts')
 
 from extract_weather import extract_weather_data, load_to_database as load_weather
-# from extract_air_quality import extract_air_quality_data, load_to_database as load_air_quality
+from extract_air_quality import extract_air_quality_data, load_to_database as load_air_quality
 
 default_args = {
     'owner': 'data_engineer',
@@ -32,18 +32,28 @@ def extract_and_load_weather():
     df = extract_weather_data()
     load_weather(df, 'weather_data')
 
+def extract_and_load_air_quality():
+    df = extract_air_quality_data()
+    load_air_quality(df, 'air_quality_data')
+
 task_extract_weather = PythonOperator(
     task_id='extract_weather',
     python_callable=extract_and_load_weather,
     dag=dag,
 )
 
+task_extract_air_quality = PythonOperator(
+    task_id='extract_air_quality',
+    python_callable=extract_and_load_air_quality,
+    dag=dag,
+)
+
 # Run dbt directly in the Airflow container
 run_dbt = BashOperator(
     task_id='run_dbt',
-    bash_command='cd /dbt && dbt run',
+    bash_command='cd /dbt && /home/airflow/.local/bin/dbt run',
     dag=dag,
 )
 
 # Set task dependencies: both extract tasks must finish before dbt runs
-[task_extract_weather] >> run_dbt
+[task_extract_weather, task_extract_air_quality] >> run_dbt

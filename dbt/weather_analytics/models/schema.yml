@@ -2,7 +2,47 @@ version: 2
 
 sources:
   - name: raw
-    database: weather_data
+    database: airflow
     schema: raw
     tables:
       - name: weather_data
+      - name: air_quality_data
+
+models:
+  - name: weather_summary
+    description: "Daily aggregated weather metrics by city"
+    columns:
+      - name: city
+        description: "City name"
+      - name: country
+        description: "Country code"
+      - name: date
+        description: "Date of measurement"
+      - name: avg_temperature
+        description: "Average temperature in Celsius"
+      - name: avg_humidity
+        description: "Average humidity percentage"
+      - name: measurement_count
+        description: "Number of measurements taken"
+
+  - name: air_quality_summary
+    description: "Daily aggregated air quality metrics by city and parameter"
+    columns:
+      - name: city
+        description: "City name"
+      - name: country
+        description: "Country code"
+      - name: parameter
+        description: "Air quality parameter (e.g., pm25, pm10, o3, no2, so2, co)"
+      - name: date
+        description: "Date of measurement"
+      - name: avg_value
+        description: "Average measurement value"
+      - name: max_value
+        description: "Maximum measurement value"
+      - name: min_value
+        description: "Minimum measurement value"
+      - name: measurement_count
+        description: "Number of measurements taken"
+      - name: location_count
+        description: "Number of distinct monitoring locations"
